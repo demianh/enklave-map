@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Enklave Runner</title>
+    <script src="https://cdn.socket.io/socket.io-1.1.0.js"></script>
+    <style>
+      html, body, #map-canvas {
+        height: 300px;
+        width: 450px;
+      }
+    </style>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+</head>
+<body onload="start()">
+
+<script type="text/javascript">
+
+var current_lat = (localStorage.getItem("lat") ? parseFloat(localStorage.getItem("lat")) : 47.37811);
+var current_lon = (localStorage.getItem("lon") ? parseFloat(localStorage.getItem("lon")) : 8.53993);
+
+var username = localStorage.getItem("username");
+var password = localStorage.getItem("password");
+
+var session_id = '';
+
+var speed_lat = 0.0001;
+var speed_lon = 0.00003;
+
+var interval;
+var iterations = 0;
+var scrap_found = 0;
+var log = [];
+var properties = [];
+
+var socket = io.connect('http://54.77.170.34:1337');
+
+function start(){
+
+    socket.on('client', function(data){
+        if (session_id == '' && data.session_id){
+            session_id = data.session_id;
+            localStorage.setItem("username", username);
+            localStorage.setItem("password", password);
+            $('#login').hide();
+            $('#botview').show();
+        }
+        if (data.messages){
+            console.log(data.messages[0]);
+            var regex = /^You have found ([0-9])+/g;
+            var match = regex.exec(data.messages[0]);
+            if (match){
+                // scrap found
+                var scrap = parseInt(match[1]);
+                addScrapMarker('blue-dot.png');
+                scrap_found += scrap;
+            } else {
+                // no scrap
+                addScrapMarker('red-dot.png');
+            }
+            craftItem();
+            log.push(data.messages[0]);
+            updateView();
+        }
+        if (data.error){
+            console.log(data.error);
+            log.push('<span class="text-danger">'+data.error+'</span>');
+            updateView();
+        }
+        if (data.events){
+            for (var ev in data.events) {
+                properties[data.events[ev].type] = data.events[ev].data;
+                updateView();
+            }
+        }
+        console.log(data);
+        
+    });
+
+    socket.on('global', function(data){
+        console.log('___GLOBAL___',data);
+    })
+
+    // autologin
+    if (username != ''){
+        $('#login').hide();
+        login();
+    }
+}
+
+function login(){
+    var data = {
+        'username': username, 
+        'password': password, 
+        'device': ['GT-I9300', 'Android', '4.4.4', 360, 'c1acca20009bf2ee']
+    };
+    socket.emit('client_data', JSON.stringify(data));
+    log.push('Login to Enklave...');
+    updateView();
+}
+
+function logout(){
+    username = '';
+    password = '';
+    localStorage.setItem("username", username);
+    localStorage.setItem("password", password);
+    location.reload();
+}
+
+function saveCredentials() {
+    username = $('#username').val();
+    password = $('#password').val();
+    login();
+}
+
+function run(){
+    interval = setInterval(function () {
+        sendLocation();
+    }, 5000);
+    $('#btn_run').toggle();
+    $('#btn_pause').toggle();
+}
+
+function pause(){
+    window.clearInterval(interval)
+    $('#btn_run').toggle();
+    $('#btn_pause').toggle();
+}
+
+function sendLocation(){
+    move();
+    iterations++;
+    console.log('moving to ' + current_lat + ', ' + current_lon);
+    var data = {
+        'session_id': session_id, 
+        'lon': current_lon, 
+        'lat': current_lat
+    };
+    socket.emit('client_data', JSON.stringify(data));
+}
+
+function craftItem(){
+    console.log('craft item ');
+    var data = {
+        'session_id': session_id, 
+        'item_crafted': 'brick', 
+        'lon': current_lon, 
+        'lat': current_lat
+    };
+    socket.emit('client_data', JSON.stringify(data));
+}
+
+function move(){
+    current_lat = current_lat + speed_lat;
+    current_lon = current_lon + speed_lon;
+    localStorage.setItem("lat", current_lat);
+    localStorage.setItem("lon", current_lon);
+    updateMarker();
+}
+
+function updateView(){
+    $('#scrap').html(scrap_found);
+    if (properties[1]){
+        $('#inventory').html('Scrap: '+properties[1][0]+'<br>Bricks: '+properties[1][1]+'<br>Cells: '+properties[1][2]);
+    }
+    if (properties[3]){
+        $('#profile').html(
+            '<h5 style="color: #'+properties[3].color+'">'+properties[3].username+' L'+properties[3].level+'</h5>' +
+            '<div>Faction: '+properties[3].faction_name+'</div>' +
+            '<div>XP: '+properties[3].xp+'/'+properties[3].next_level_xp+'</div>' +
+            '<div>Energy: '+properties[3].energy+'/'+properties[3].max_energy+'</div>'
+        );
+    }
+    $('#log').html(log.join('<br>'));
+}
+
+
+// ---- MAP ----
+
+var map;
+var marker;
+
+function initialize() {
+    var mapOptions = {
+        zoom: 15,
+        center: new google.maps.LatLng(current_lat, current_lon)
+    };
+    map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+
+    updateMarker();
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);
+
+function updateMarker() {
+  if(marker){
+    marker.setMap(null);
+  }
+  marker = new google.maps.Marker({
+    position: new google.maps.LatLng(current_lat, current_lon),
+    map: map
+  });
+  map.setCenter(marker.getPosition());
+  google.maps.event.trigger(map, 'resize');
+}
+
+function addScrapMarker(img) {
+  var scrap = new google.maps.Marker({
+    position: new google.maps.LatLng(current_lat, current_lon),
+    map: map,
+    icon: img
+  });
+}
+
+</script>
+<div class="container">
+    <div id="botview" style="display: none;">
+        <div class="row">
+          <div class="col-md-6">
+            <h3>Current Position</h3> 
+            <div id="map-canvas" class="img-thumbnail"></div>
+            <div>Scrap found: <span id="scrap">0</span></div>
+          </div>
+          <div class="col-md-6">
+            <h3>Profile</h3>
+            <div id="profile"></div>
+            <h3>Inventory</h3>
+            <div id="inventory"></div>
+            <h3>Controls</h3>
+            <button type="button" class="btn btn-primary" onclick="run()" id="btn_run">Start</button>
+            <button type="button" class="btn btn-primary" onclick="pause()" id="btn_pause" style="display: none;">Pause</button>
+          </div>
+        </div>
+    </div>
+    <div id="login">
+        <h3>Login</h3>
+        <form class="form-horizontal" role="form">
+          <div class="form-group">
+            <div class="col-sm-3">
+              <input type="text" class="form-control" id="username" placeholder="Username">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="col-sm-3">
+              <input type="password" class="form-control" id="password" placeholder="Password">
+              <span class="help-block">PS: your password is not saved</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="col-sm-3">
+              <button type="button" class="btn btn-primary" onclick="saveCredentials()">Sign in</button>
+            </div>
+          </div>
+        </form>
+    </div>
+    <h3>Log</h3> 
+    <div id="log"></div>
+    <div>
+        <br>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+</div>
+</body>
+</html>
