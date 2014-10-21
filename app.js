@@ -41,11 +41,11 @@ function start(){
             if (match){
                 // scrap found
                 var scrap = parseInt(match[1]);
-                addScrapMarker('blue-dot.png');
+                addScrapMarker('img/blue-dot.png');
                 scrap_found += scrap;
             } else {
                 // no scrap
-                addScrapMarker('red-dot.png');
+                addScrapMarker('img/red-dot.png');
             }
             craftItem();
             log.unshift(data.messages[0]);
