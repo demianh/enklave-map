@@ -198,7 +198,8 @@ var enklave_markers = [];
 function initialize() {
     var mapOptions = {
         zoom: 15,
-        center: new google.maps.LatLng(current_lat, current_lon)
+        center: new google.maps.LatLng(current_lat, current_lon),
+        styles: [{"featureType":"all","elementType":"all","stylers":[{"invert_lightness":true},{"saturation":10},{"lightness":30},{"gamma":0.5},{"hue":"#435158"}]}]
     };
     map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
 
