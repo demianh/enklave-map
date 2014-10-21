@@ -48,13 +48,12 @@ function start(){
                 addScrapMarker('img/red-dot.png');
             }
             craftItem();
-            log.unshift(data.messages[0]);
+            logging(data.messages[0]);
             propertiesUpdated();
         }
         if (data.error){
             console.log(data.error);
-            log.unshift('<span class="text-danger">'+data.error+'</span>');
-            propertiesUpdated();
+            logging('<span class="text-danger">'+data.error+'</span>');
         }
         if (data.events){
             for (var ev in data.events) {
@@ -96,8 +95,7 @@ function login(){
         'device': ['GT-I9300', 'Android', '4.4.4', 360, 'c1acca20009bf2ee']
     };
     socket.emit('client_data', JSON.stringify(data));
-    log.unshift('Login to Enklave...');
-    propertiesUpdated();
+    logging('Login to Enklave...');
 }
 
 function logout(){
@@ -115,6 +113,11 @@ function saveCredentials() {
     password = $('#password').val();
     login();
     return false;
+}
+
+function logging(message){
+    log.unshift(message);
+    propertiesUpdated();
 }
 
 function run(){
