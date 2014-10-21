@@ -204,9 +204,37 @@ function initialize() {
 
     updateMarker();
     enklavesUpdated();
+    setGeoLocationMarker();
 }
 
 google.maps.event.addDomListener(window, 'load', initialize);
+
+function setGeoLocationMarker(){
+  if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var pos = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+      var myloc = new google.maps.Marker({
+        clickable: false,
+        position: pos,
+        icon: new google.maps.MarkerImage(
+            '//maps.gstatic.com/mapfiles/mobile/mobileimgs2.png',
+            new google.maps.Size(22,22),
+            new google.maps.Point(0,18),
+            new google.maps.Point(11,11)
+        ),
+        shadow: null,
+        zIndex: 999,
+        map: map
+      });
+      map.setCenter(pos);
+    }, function() {
+      logging('Unable to get your location');
+    });
+  } else {
+    // Browser doesn't support Geolocation
+    logging('Geolocation not available');
+  }
+}
 
 function updateMarker() {
   if(marker){
