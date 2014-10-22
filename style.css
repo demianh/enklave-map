@@ -28,3 +28,13 @@
     width: 300px;
     background: rgba(78, 93, 108, 0.9);
 }
+
+.enklavePopup {
+  color: #333;
+  min-width: 300px;
+  padding: 10px;
+}
+
+.enklavePopup .img-thumbnail {
+  max-height: 100px;
+}
