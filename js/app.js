@@ -1,20 +1,22 @@
 var HOST = 'http://enklave-mobile.com';
 var SOCKET_PORT = '1337';
 
-var current_lat = (localStorage.getItem("lat") ? parseFloat(localStorage.getItem("lat")) : 47.37811);
-var current_lon = (localStorage.getItem("lon") ? parseFloat(localStorage.getItem("lon")) : 8.53993);
-
 var username = (localStorage.getItem("username") ? localStorage.getItem("username") : '');
 var password = (localStorage.getItem("password") ? localStorage.getItem("password") : '');
 
 var properties = (localStorage.getItem("properties") ? JSON.parse(localStorage.getItem("properties")) : []);
 
+var defaultLocation = {
+  lat: 47.37811,
+  lon: 8.53993
+};
+var myLocation = (localStorage.getItem("myLocation") ? JSON.parse(localStorage.getItem("myLocation")) : defaultLocation);
+
+
 var session_id = '';
 
-var speed_lat = 0.0001;
-var speed_lon = 0.00003;
 
-var interval;
+
 var iterations = 0;
 var scrap_found = 0;
 var log = [];
@@ -126,28 +128,11 @@ function logging(message) {
   propertiesUpdated();
 }
 
-function run() {
-  interval = setInterval(function () {
-    sendLocation();
-  }, 5000);
-  $('#btn_run').toggle();
-  $('#btn_pause').toggle();
-}
-
-function pause() {
-  window.clearInterval(interval)
-  $('#btn_run').toggle();
-  $('#btn_pause').toggle();
-}
-
 function sendLocation() {
-  move();
-  iterations++;
-  console.log('moving to ' + current_lat + ', ' + current_lon);
   var data = {
     'session_id': session_id,
-    'lon': current_lon,
-    'lat': current_lat
+    'lon': BOT.location.lon,
+    'lat': BOT.location.lat
   };
   socket.emit('client_data', JSON.stringify(data));
 }
@@ -157,18 +142,10 @@ function craftItem() {
   var data = {
     'session_id': session_id,
     'item_crafted': 'brick',
-    'lon': current_lon,
-    'lat': current_lat
+    'lon': BOT.location.lon,
+    'lat': BOT.location.lat
   };
   socket.emit('client_data', JSON.stringify(data));
-}
-
-function move() {
-  current_lat = current_lat + speed_lat;
-  current_lon = current_lon + speed_lon;
-  localStorage.setItem("lat", current_lat);
-  localStorage.setItem("lon", current_lon);
-  updateMarker();
 }
 
 function propertiesUpdated() {
@@ -204,7 +181,7 @@ var enklave_markers = [];
 function initializeMap() {
   var mapOptions = {
     zoom: 15,
-    center: new google.maps.LatLng(current_lat, current_lon),
+    center: new google.maps.LatLng(myLocation.lat, myLocation.lon),
     styles: [{
       "featureType": "all",
       "elementType": "all",
@@ -217,7 +194,6 @@ function initializeMap() {
     content: "Loading..."
   });
 
-  updateMarker();
   enklavesUpdated();
   setGeoLocationMarker();
 }
@@ -227,7 +203,10 @@ google.maps.event.addDomListener(window, 'load', initializeMap);
 function setGeoLocationMarker() {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function (position) {
-      var pos = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+      myLocation.lat = position.coords.latitude;
+      myLocation.lon = position.coords.longitude;
+      localStorage.setItem("myLocation", JSON.stringify(myLocation));
+      var pos = new google.maps.LatLng(myLocation.lat, myLocation.lon);
       var myloc = new google.maps.Marker({
         clickable: false,
         position: pos,
@@ -241,7 +220,7 @@ function setGeoLocationMarker() {
         zIndex: 999,
         map: map
       });
-      //map.setCenter(pos);
+      map.setCenter(pos);
     }, function () {
       logging('Unable to get your location');
     });
@@ -251,12 +230,12 @@ function setGeoLocationMarker() {
   }
 }
 
-function updateMarker() {
+function updateBotMarker() {
   if (marker) {
     marker.setMap(null);
   }
   marker = new google.maps.Marker({
-    position: new google.maps.LatLng(current_lat, current_lon),
+    position: new google.maps.LatLng(BOT.location.lat, BOT.location.lon),
     map: map
   });
   map.setCenter(marker.getPosition());
@@ -264,8 +243,8 @@ function updateMarker() {
 }
 
 function addScrapMarker(img) {
-  var scrap = new google.maps.Marker({
-    position: new google.maps.LatLng(current_lat, current_lon),
+  new google.maps.Marker({
+    position: new google.maps.LatLng(BOT.location.lat, BOT.location.lon),
     map: map,
     icon: img
   });
