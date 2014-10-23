@@ -382,5 +382,9 @@ function enklavesUpdated() {
       }
     }
   }
+  // update open infowindow
+  if (infowindow.anchor){
+    infowindow.setContent(getEnklaveMarkup(infowindow.anchor.enklave_id));
+  }
   google.maps.event.trigger(map, 'resize');
 }
