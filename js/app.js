@@ -13,6 +13,7 @@ var defaultLocation = {
 var myLocation = (localStorage.getItem("myLocation") ? JSON.parse(localStorage.getItem("myLocation")) : defaultLocation);
 
 var session_id = '';
+var device_id = (localStorage.getItem("device_id") ? localStorage.getItem("device_id") : generateDeviceId());
 
 var scrap_found = 0;
 var log = [];
@@ -30,16 +31,24 @@ function start() {
   // Client Data
   socket.on('client', function (data) {
     console.log('___CLIENT___', data);
+
+    // Client Login
     if (session_id == '' && data.session_id) {
       session_id = data.session_id;
       localStorage.setItem("username", username);
       localStorage.setItem("password", password);
       $('#login').modal('hide');
       $('#sidebar').show();
+      // Hide sidebar on Mobile
+      if ($(window).width() < 700){
+        toggleSidebar();
+      }
       google.maps.event.trigger(map, 'resize');
       logging('Login successful');
       BOT.movetome();
     }
+
+    // Client Messages
     if (data.messages) {
       for (var i in data.messages) {
         var msg = data.messages[i];
@@ -64,22 +73,31 @@ function start() {
       }
       propertiesUpdated();
     }
+
+    // Client Errors
     if (data.error) {
       console.log(data.error);
       logging('<span class="text-danger">' + data.error + '</span>');
     }
+
+    // Client Events
     if (data.events) {
       for (var ev in data.events) {
         var event = data.events[ev];
-        properties[event.type] = event.data;
         console.log(event);
         switch (event.type) {
           case 1: // inventory update
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
+            break;
+          case 2: // enklaves list
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
+            enklavesUpdated();
             break;
           case 3: // profile update
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
             break;
           default:
-            properties[event.type] = event.data;
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
             console.log('Unknown event type');
         }
         propertiesUpdated();
@@ -97,30 +115,19 @@ function start() {
         var event = data.events[i];
         console.log(event);
         switch (event.type) {
-          case 1: // inventory
-            updateInventory(event.data);
-            break;
-          case 2: // enklaves
-            updateEnklaves(event.data);
-            break;
-          case 3: // profile
-            updateCharacter(event.data);
-            break;
           case 4: // single enklave
             updateEnklave(event.data);
+            propertiesUpdated();
             break;
-          case 5: // fight start
-            break;
-          case 6: // enklave list
-            properties[event.type] = event.data;
-            enklavesUpdated();
+          case 6: // fight data
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
             break;
           case 7: // fight ended
+            properties[event.type] = mergeProperties(properties[event.type], event.data);
             break;
           default:
             console.log('Unknown event type');
         }
-        propertiesUpdated();
       }
     }
   })
@@ -138,7 +145,7 @@ function login() {
   var data = {
     'username': username,
     'password': password,
-    'device': ['GT-I9300', 'Android', '4.4.4', 360, 'c1acca20009bf2ee']
+    'device': ['GT-I9300', 'Android', '4.4.4', 360, device_id]
   };
   socket.emit('client_data', JSON.stringify(data));
   logging('Login to Enklave...');
@@ -163,6 +170,15 @@ function saveCredentials() {
   return false;
 }
 
+function generateDeviceId() {
+  var length = 16;
+  var chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  var result = '';
+  for (var i = length; i > 0; --i) result += chars[Math.round(Math.random() * (chars.length - 1))];
+  localStorage.setItem("device_id", result);
+  return result;
+}
+
 function logging(message) {
   log.unshift(message);
   propertiesUpdated();
@@ -171,19 +187,13 @@ function logging(message) {
 function updateEnklave(data){
   for (var j in properties[2]) {
     if (properties[2][j].id == data.id){
-      properties[2][j].bricks =  data.bricks;
-      properties[2][j].bricks_upgrade = data.bricks_upgrade;
-      properties[2][j].faction_id = data.faction_id;
-      properties[2][j].level = data.level;
-      properties[2][j].scrap_capacity = data.scrap_capacity;
-      properties[2][j].scrap_production = data.scrap_production;
+      if (properties[2][j].faction_id != data.faction_id){
+        console.log('ENKLAVE FACTION CHANGED', properties[2][j].faction_id, data.faction_id);
+      }
+      properties[2][j] = mergeProperties(properties[2][j], data);
       enklavesUpdated();
     }
   }
-}
-
-function updateCharacter(data){
-  console.log('___PROFILE UPDATE___',data);
 }
 
 function getEnklave(id){
@@ -195,6 +205,20 @@ function getEnklave(id){
       }
     }
   }
+}
+
+function mergeProperties(obj1, obj2){
+  if (typeof obj1 == 'undefined'){
+    return obj2;
+  }
+  if (typeof obj2 !== 'undefined'){
+    for (var key in obj2){
+      if (obj2.hasOwnProperty(key)) {
+        obj1[key] = obj2[key];
+      }
+    }
+  }
+  return obj1;
 }
 
 function propertiesUpdated() {
@@ -212,6 +236,11 @@ function propertiesUpdated() {
     );
   }
   $('#log').html(log.join('<br>'));
+}
+
+function toggleSidebar(){
+  $('#sidebar').toggle();
+  $('#sidebar-closed').toggle();
 }
 
 /* api
@@ -324,49 +353,33 @@ function getEnklaveMarkup(id){
 function enklavesUpdated() {
   var enklaves = properties[2];
   if (enklaves) {
-    // remove old markers
-    /*
-    for (var i in enklaveMarkers) {
-      enklaveMarkers[i].setMap(null);
-    }
-    */
     // add new markers
     for (var i in enklaves) {
       var enklave = enklaves[i];
-      var enklaveMarker = new google.maps.Marker({
-        position: new google.maps.LatLng(enklave.latitude, enklave.longitude),
-        map: map,
-        icon: {
-          url: 'img/enklave-faction-' + (enklave.faction_id ? enklave.faction_id : '0') + '.png',
-          scaledSize: new google.maps.Size(32, 32),
-          origin: new google.maps.Point(0, 0),
-          anchor: new google.maps.Point(16, 16)
-        },
-        enklave_id: enklave.id
-      })
+      // add if new or faction changed
+      if(typeof enklaveMarkers[enklave.id] == 'undefined' || enklaveMarkers[enklave.id].faction_id != enklave.faction_id){
+        if (typeof enklaveMarkers[enklave.id] != 'undefined'){
+          enklaveMarkers[enklave.id].setMap(null);
+        }
+        var enklaveMarker = new google.maps.Marker({
+          position: new google.maps.LatLng(enklave.latitude, enklave.longitude),
+          map: map,
+          icon: {
+            url: 'img/enklave-faction-' + (enklave.faction_id ? enklave.faction_id : '0') + '.png',
+            scaledSize: new google.maps.Size(32, 32),
+            origin: new google.maps.Point(0, 0),
+            anchor: new google.maps.Point(16, 16)
+          },
+          enklave_id: enklave.id,
+          faction_id: enklave.faction_id
+        });
 
-      /*
-       bricks: 2
-       bricks_upgrade: 9
-       faction_id: "1"
-       id: "675"
-       image_id: "934"
-       img_src: "http://enklave-mobile.com/upload/location-image/934.JPG"
-       latitude: "47.3780275"
-       level: 0
-       longitude: "8.5397237"
-       name: "Zurich Mainstation"
-       original_filename: "ZurichMainstation.JPG"
-       scrap: 400
-       scrap_capacity: 400
-       scrap_production: 25
-      */
-
-      google.maps.event.addListener(enklaveMarker, 'click', function () {
-        infowindow.setContent(getEnklaveMarkup(this.enklave_id));
-        infowindow.open(map, this);
-      });
-      enklaveMarkers[enklave.id] = enklaveMarker;
+        google.maps.event.addListener(enklaveMarker, 'click', function () {
+          infowindow.setContent(getEnklaveMarkup(this.enklave_id));
+          infowindow.open(map, this);
+        });
+        enklaveMarkers[enklave.id] = enklaveMarker;
+      }
     }
   }
   google.maps.event.trigger(map, 'resize');

@@ -21,20 +21,37 @@
     overflow-y: scroll;
 }
 
-#sidebar {
-    position: absolute;
-    top: 50px;
-    right: 20px;
-    width: 300px;
-    background: rgba(78, 93, 108, 0.9);
+#sidebar,
+#sidebar-closed {
+  position: absolute;
+  top: 50px;
+  right: 20px;
+  width: 250px;
+  background: rgba(78, 93, 108, 0.9);
+}
+
+#sidebar-closed {
+  width: 70px;
+  height: 40px;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
 }
 
 .enklavePopup {
   color: #333;
-  min-width: 300px;
+  min-width: 250px;
   padding: 10px;
 }
 
 .enklavePopup .img-thumbnail {
   max-height: 100px;
+}
+
+.enklavePopup h3 {
+  margin-top: 0;
 }

@@ -17,25 +17,29 @@
 
 <div id="map-canvas"></div>
 
+<div id="sidebar-closed" style="display: none" class="panel panel-default">
+  <div onclick="toggleSidebar()" class="sidebar-toggle">Sidebar</div>
+</div>
+
 <div id="sidebar" class="panel panel-default">
-    <div class="panel-body">
-      <h3>Profile</h3>
-      <p id="profile">n/a</p>
-      <h3>Inventory</h3>
-      <p id="inventory">n/a</p>
-      <h3>Bot Control</h3>
-      <p>
-        <button type="button" class="btn btn-primary" onclick="BOT.run()" id="btn_run"><span class="glyphicon glyphicon-play"></span>&nbsp;&nbsp;Start</button>
-        <button type="button" class="btn btn-primary" onclick="BOT.pause()" id="btn_pause" style="display: none;"><span class="glyphicon glyphicon-pause"></span>&nbsp;&nbsp;Pause</button>
-        <button type="button" class="btn btn-primary" onclick="BOT.movetome()" id="btn_movetome"><span class="glyphicon glyphicon-map-marker"></span>&nbsp;&nbsp;Move Here</button>
-      </p>
-      Speed: <span id="speed_value">5000ms</span><br>
-      <input type="range" min="5" max="100" value="50" id="speed" onchange="BOT.setSpeed(this.value);"/>
-      Direction: <span id="direction_value">0°</span><br>
-      <input type="range" min="0" max="360" value="0" id="direction" onchange="BOT.setDirection(this.value);"/>
-      <p>Scrap found: <span id="scrap">0</span></p>
-      <p><a href="#" onclick="logout()">Logout</a></p>
-    </div>
+  <div onclick="toggleSidebar()" class="sidebar-toggle">Hide</div>
+  <div class="panel-body">
+    <p id="profile">n/a</p>
+    <h4>Inventory</h4>
+    <p id="inventory">n/a</p>
+    <h4>Bot Control</h4>
+    <p>
+      <button type="button" class="btn btn-primary" onclick="BOT.run()" id="btn_run"><span class="glyphicon glyphicon-play"></span>&nbsp;&nbsp;Start</button>
+      <button type="button" class="btn btn-primary" onclick="BOT.pause()" id="btn_pause" style="display: none;"><span class="glyphicon glyphicon-pause"></span>&nbsp;&nbsp;Pause</button>
+      <button type="button" class="btn btn-primary" onclick="BOT.movetome()" id="btn_movetome"><span class="glyphicon glyphicon-map-marker"></span>&nbsp;&nbsp;Move Here</button>
+    </p>
+    Speed: <span id="speed_value">5000ms</span><br>
+    <input type="range" min="5" max="100" value="50" id="speed" onchange="BOT.setSpeed(this.value);"/>
+    Direction: <span id="direction_value">0°</span><br>
+    <input type="range" min="0" max="360" value="0" id="direction" onchange="BOT.setDirection(this.value);"/>
+    <p>Scrap found: <span id="scrap">0</span></p>
+    <p><a href="#" onclick="logout()">Logout</a></p>
+  </div>
 </div>
 
 <div class="modal fade" id="login" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
