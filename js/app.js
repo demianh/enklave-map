@@ -29,6 +29,7 @@ function start() {
 
   // Client Data
   socket.on('client', function (data) {
+    console.log('___CLIENT___', data);
     if (session_id == '' && data.session_id) {
       session_id = data.session_id;
       localStorage.setItem("username", username);
@@ -37,14 +38,15 @@ function start() {
       $('#sidebar').show();
       google.maps.event.trigger(map, 'resize');
       logging('Login successful');
+      BOT.movetome();
     }
     if (data.messages) {
       for (var i in data.messages) {
         var msg = data.messages[i];
-        console.log(msg);
+        //console.log(msg);
         var regex = /^You have found ([0-9]+)/g;
         var match = regex.exec(msg);
-        console.log(match);
+        //console.log(match);
         if (match) {
           // scrap found
           var scrap = parseInt(match[1]);
@@ -68,7 +70,18 @@ function start() {
     }
     if (data.events) {
       for (var ev in data.events) {
-        properties[data.events[ev].type] = data.events[ev].data;
+        var event = data.events[ev];
+        properties[event.type] = event.data;
+        console.log(event);
+        switch (event.type) {
+          case 1: // inventory update
+            break;
+          case 3: // profile update
+            break;
+          default:
+            properties[event.type] = event.data;
+            console.log('Unknown event type');
+        }
         propertiesUpdated();
       }
     }
@@ -82,34 +95,31 @@ function start() {
     if (data.events) {
       for (var i in data.events) {
         var event = data.events[i];
-        properties[event.type] = event.data;
-
-        // enklaves list
-        if (event.type == 6) {
-          enklavesUpdated();
+        console.log(event);
+        switch (event.type) {
+          case 1: // inventory
+            updateInventory(event.data);
+            break;
+          case 2: // enklaves
+            updateEnklaves(event.data);
+            break;
+          case 3: // profile
+            updateCharacter(event.data);
+            break;
+          case 4: // single enklave
+            updateEnklave(event.data);
+            break;
+          case 5: // fight start
+            break;
+          case 6: // enklave list
+            properties[event.type] = event.data;
+            enklavesUpdated();
+            break;
+          case 7: // fight ended
+            break;
+          default:
+            console.log('Unknown event type');
         }
-
-        // single enklave update
-        if (event.type == 4) {
-          console.log(event.data);
-          for (var j in properties[2]) {
-            if (properties[2][j].id == event.data.id){
-              properties[2][j].bricks =  event.data.bricks;
-              properties[2][j].bricks_upgrade = event.data.bricks_upgrade;
-              properties[2][j].faction_id = event.data.faction_id;
-              properties[2][j].level = event.data.level;
-              properties[2][j].scrap_capacity = event.data.scrap_capacity;
-              properties[2][j].scrap_production = event.data.scrap_production;
-              enklavesUpdated();
-            }
-          }
-        }
-
-        // fight
-        if (event.type == 6) {
-
-        }
-
         propertiesUpdated();
       }
     }
@@ -138,9 +148,11 @@ function logout() {
   username = '';
   password = '';
   properties = [];
+  myLocation = defaultLocation;
   localStorage.setItem("username", username);
   localStorage.setItem("password", password);
   localStorage.setItem("properties", JSON.stringify(properties));
+  localStorage.setItem("myLocation", JSON.stringify(myLocation));
   location.reload();
 }
 
@@ -154,6 +166,24 @@ function saveCredentials() {
 function logging(message) {
   log.unshift(message);
   propertiesUpdated();
+}
+
+function updateEnklave(data){
+  for (var j in properties[2]) {
+    if (properties[2][j].id == data.id){
+      properties[2][j].bricks =  data.bricks;
+      properties[2][j].bricks_upgrade = data.bricks_upgrade;
+      properties[2][j].faction_id = data.faction_id;
+      properties[2][j].level = data.level;
+      properties[2][j].scrap_capacity = data.scrap_capacity;
+      properties[2][j].scrap_production = data.scrap_production;
+      enklavesUpdated();
+    }
+  }
+}
+
+function updateCharacter(data){
+  console.log('___PROFILE UPDATE___',data);
 }
 
 function getEnklave(id){
@@ -241,6 +271,7 @@ function setGeoLocationMarker() {
         map: map
       });
       map.setCenter(pos);
+      BOT.movetome();
     }, function () {
       logging('Unable to get your location');
     });
