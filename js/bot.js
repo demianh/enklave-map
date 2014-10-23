@@ -1,6 +1,7 @@
 var BOT = {
   interval: {},
   speed: 5000,
+  socket: null,
   location: {
     lat: (localStorage.getItem("lat") ? parseFloat(localStorage.getItem("lat")) : 47.37811),
     lon: (localStorage.getItem("lon") ? parseFloat(localStorage.getItem("lon")) : 8.53993)
@@ -25,7 +26,7 @@ var BOT = {
     this.location.lon = lon;
     localStorage.setItem("lat", lat);
     localStorage.setItem("lon", lon);
-    sendLocation();
+    this.sendLocation();
     updateBotMarker();
   },
   movetome: function() {
@@ -41,7 +42,32 @@ var BOT = {
     )
   },
   craftItem: function(){
-
+    console.log('craft item ');
+    var data = {
+      'session_id': session_id,
+      'item_crafted': 'brick',
+      'lon': this.location.lon,
+      'lat': this.location.lat
+    };
+    this.socket.emit('client_data', JSON.stringify(data));
+  },
+  buildUpgrade: function(enklave_id){
+    console.log('build upgrade: '+enklave_id);
+    var data = {
+      'session_id': session_id,
+      'build_upgrade': enklave_id,
+      'lon': this.location.lon,
+      'lat': this.location.lat
+    };
+    this.socket.emit('client_data', JSON.stringify(data));
+  },
+  sendLocation: function() {
+    var data = {
+      'session_id': session_id,
+      'lon': this.location.lon,
+      'lat': this.location.lat
+    };
+    this.socket.emit('client_data', JSON.stringify(data));
   },
   run: function(){
     this.interval = setInterval(function () {

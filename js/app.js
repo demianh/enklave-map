@@ -12,23 +12,20 @@ var defaultLocation = {
 };
 var myLocation = (localStorage.getItem("myLocation") ? JSON.parse(localStorage.getItem("myLocation")) : defaultLocation);
 
-
 var session_id = '';
 
-
-
-var iterations = 0;
 var scrap_found = 0;
 var log = [];
 
 var factionNames = ["Neutral", "Prometheans", "Architechs", "Edenites"];
 var factionColors = ["#888", "#ff0000", "#00ffff", "#00ff00"];
 
-var infowindow = null;
-
-var socket = io.connect(HOST + ':' + SOCKET_PORT);
+var socket;
 
 function start() {
+
+  socket = io.connect(HOST + ':' + SOCKET_PORT);
+  BOT.socket = socket;
 
   // Client Data
   socket.on('client', function (data) {
@@ -39,24 +36,30 @@ function start() {
       $('#login').modal('hide');
       $('#sidebar').show();
       google.maps.event.trigger(map, 'resize');
+      logging('Login successful');
     }
     if (data.messages) {
-      console.log(data.messages[0]);
-      var regex = /^You have found ([0-9])+/g;
-      var match = regex.exec(data.messages[0]);
-      if (match) {
-        // scrap found
-        var scrap = parseInt(match[1]);
-        addScrapMarker('img/dot-green.png');
-        scrap_found += scrap;
-      } else {
-        // no scrap
-        addScrapMarker('img/dot-red.png');
+      for (var i in data.messages) {
+        var msg = data.messages[i];
+        console.log(msg);
+        var regex = /^You have found ([0-9]+)/g;
+        var match = regex.exec(msg);
+        console.log(match);
+        if (match) {
+          // scrap found
+          var scrap = parseInt(match[1]);
+          addScrapMarker('img/dot-green.png');
+          scrap_found += scrap;
+        } else {
+          // no scrap
+          addScrapMarker('img/dot-red.png');
+        }
+        if (properties[1][0] > 20){
+          BOT.craftItem();
+        }
+        logging(msg);
+
       }
-      if (properties[1][0] > 20){
-        craftItem();
-      }
-      logging(data.messages[0]);
       propertiesUpdated();
     }
     if (data.error) {
@@ -77,12 +80,37 @@ function start() {
   socket.on('global', function (data) {
     console.log('___GLOBAL___', data);
     if (data.events) {
-      for (var ev in data.events) {
-        properties[data.events[ev].type] = data.events[ev].data;
-        propertiesUpdated();
-        if (data.events[ev].type == 6) {
+      for (var i in data.events) {
+        var event = data.events[i];
+        properties[event.type] = event.data;
+
+        // enklaves list
+        if (event.type == 6) {
           enklavesUpdated();
         }
+
+        // single enklave update
+        if (event.type == 4) {
+          console.log(event.data);
+          for (var j in properties[2]) {
+            if (properties[2][j].id == event.data.id){
+              properties[2][j].bricks =  event.data.bricks;
+              properties[2][j].bricks_upgrade = event.data.bricks_upgrade;
+              properties[2][j].faction_id = event.data.faction_id;
+              properties[2][j].level = event.data.level;
+              properties[2][j].scrap_capacity = event.data.scrap_capacity;
+              properties[2][j].scrap_production = event.data.scrap_production;
+              enklavesUpdated();
+            }
+          }
+        }
+
+        // fight
+        if (event.type == 6) {
+
+        }
+
+        propertiesUpdated();
       }
     }
   })
@@ -128,24 +156,15 @@ function logging(message) {
   propertiesUpdated();
 }
 
-function sendLocation() {
-  var data = {
-    'session_id': session_id,
-    'lon': BOT.location.lon,
-    'lat': BOT.location.lat
-  };
-  socket.emit('client_data', JSON.stringify(data));
-}
-
-function craftItem() {
-  console.log('craft item ');
-  var data = {
-    'session_id': session_id,
-    'item_crafted': 'brick',
-    'lon': BOT.location.lon,
-    'lat': BOT.location.lat
-  };
-  socket.emit('client_data', JSON.stringify(data));
+function getEnklave(id){
+  var enklaves = properties[2];
+  if (enklaves) {
+    for (var i in enklaves) {
+      if(enklaves[i].id == id){
+        return enklaves[i];
+      }
+    }
+  }
 }
 
 function propertiesUpdated() {
@@ -176,7 +195,8 @@ function propertiesUpdated() {
 
 var map;
 var marker;
-var enklave_markers = [];
+var enklaveMarkers = [];
+var infowindow = null;
 
 function initializeMap() {
   var mapOptions = {
@@ -250,12 +270,38 @@ function addScrapMarker(img) {
   });
 }
 
+function getEnklaveMarkup(id){
+  var enklave = getEnklave(id);
+  var faction_id = (enklave.faction_id ? enklave.faction_id : 0);
+  return '<div class="enklavePopup">' +
+    '<h3>' + enklave.name + '</h3>' +
+    '<h4 style="color: ' + factionColors[faction_id] + '">' + factionNames[faction_id] + '</h4>' +
+    '<div><img class="img-thumbnail" src="' + enklave.img_src + '"></div>' +
+    '<br>' +
+    '<div><b>Level:</b> ' + enklave.level + '</div>' +
+    '<div><b>Bricks:</b> ' + enklave.bricks + '/' + enklave.bricks_upgrade + '</div>' +
+    '<div><b>Production:</b> ' + enklave.scrap_production + '/h</div>' +
+    '<div><b>Storage:</b> ' + enklave.scrap + '/' + enklave.scrap_production + '</div>' +
+    '<div><b>ID:</b> ' + enklave.id + '</div>' +
+    '<div>' +
+    '<button type="button" class="btn btn-primary" onclick="BOT.moveto('+enklave.latitude+','+enklave.longitude+')"><span class="glyphicon glyphicon-map-marker"></span>&nbsp;&nbsp;Jump Here</button> ' +
+    '<button type="button" class="btn btn-primary" onclick="BOT.buildUpgrade('+enklave.id+')"><span class="glyphicon glyphicon-home"></span>&nbsp;&nbsp;Build</button>' +
+    '</div>' +
+    '</div>';
+}
+
 function enklavesUpdated() {
   var enklaves = properties[2];
   if (enklaves) {
+    // remove old markers
+    /*
+    for (var i in enklaveMarkers) {
+      enklaveMarkers[i].setMap(null);
+    }
+    */
+    // add new markers
     for (var i in enklaves) {
       var enklave = enklaves[i];
-      var faction_id = (enklave.faction_id ? enklave.faction_id : 0);
       var enklaveMarker = new google.maps.Marker({
         position: new google.maps.LatLng(enklave.latitude, enklave.longitude),
         map: map,
@@ -265,17 +311,7 @@ function enklavesUpdated() {
           origin: new google.maps.Point(0, 0),
           anchor: new google.maps.Point(16, 16)
         },
-        html: '<div class="enklavePopup">' +
-        '<h3>' + enklave.name + '</h3>' +
-        '<h4 style="color: ' + factionColors[faction_id] + '">' + factionNames[faction_id] + '</h4>' +
-        '<div><img class="img-thumbnail" src="' + enklave.img_src + '"></div>' +
-        '<br>' +
-        '<div><b>Level:</b> ' + enklave.level + '</div>' +
-        '<div><b>Bricks:</b> ' + enklave.bricks + '/' + enklave.bricks_upgrade + '</div>' +
-        '<div><b>Production:</b> ' + enklave.scrap_production + '/h</div>' +
-        '<div><b>Storage:</b> ' + enklave.scrap + '/' + enklave.scrap_production + '</div>' +
-        '<div><b>Storage:</b> ' + enklave.scrap + '/' + enklave.scrap_production + '</div>' +
-        '</div>'
+        enklave_id: enklave.id
       })
 
       /*
@@ -296,12 +332,11 @@ function enklavesUpdated() {
       */
 
       google.maps.event.addListener(enklaveMarker, 'click', function () {
-        infowindow.setContent(this.html);
+        infowindow.setContent(getEnklaveMarkup(this.enklave_id));
         infowindow.open(map, this);
       });
+      enklaveMarkers[enklave.id] = enklaveMarker;
     }
-
-
   }
   google.maps.event.trigger(map, 'resize');
 }
